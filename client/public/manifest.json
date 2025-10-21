@@ -1,0 +1,9 @@
+{
+  "name": "Семейный портал госуслуг",
+  "short_name": "Семья",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#6366f1",
+  "icons": []
+}

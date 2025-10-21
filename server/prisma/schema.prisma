@@ -1,0 +1,253 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("DATABASE_PROVIDER")
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PARTNER
+  ADMIN
+}
+
+enum CaseStatus {
+  WAITING
+  REVIEW
+  RECEIVED
+}
+
+enum TaskChannel {
+  PUSH
+  EMAIL
+  SMS
+}
+
+model Family {
+  id           String             @id @default(cuid())
+  name         String
+  users        User[]
+  cases        Case[]
+  documents    Document[]
+  tasks        Task[]
+  reminders    Reminder[]
+  notifications Notification[]
+  letterTemplates LetterTemplate[]
+  securitySetting SecuritySetting?
+  activityLogs ActivityLog[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  firstName         String
+  lastName          String
+  avatarUrl         String?
+  totpSecret        String?
+  emailVerified     Boolean   @default(false)
+  role              UserRole  @default(PARTNER)
+  familyId          String
+  family            Family    @relation(fields: [familyId], references: [id])
+  cases             Case[]    @relation("CaseOwner")
+  documents         Document[]
+  tasks             Task[]
+  comments          Comment[]
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Agency {
+  id        String  @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  cases     Case[]
+  documents Document[]
+  tags      Tag[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Case {
+  id            String      @id @default(cuid())
+  title         String
+  description   String?
+  status        CaseStatus  @default(WAITING)
+  progress      Int         @default(0)
+  deadline      DateTime?
+  familyId      String
+  family        Family      @relation(fields: [familyId], references: [id])
+  ownerId       String
+  owner         User        @relation("CaseOwner", fields: [ownerId], references: [id])
+  agencyId      String?
+  agency        Agency?     @relation(fields: [agencyId], references: [id])
+  tasks         Task[]
+  documents     Document[]
+  comments      Comment[]
+  reminders     Reminder[]
+  activityLogs  ActivityLog[]
+  history       CaseHistory[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model CaseHistory {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id])
+  action    String
+  data      Json?
+  createdAt DateTime @default(now())
+}
+
+model Document {
+  id            String            @id @default(cuid())
+  title         String
+  path          String
+  mimeType      String
+  size          Int
+  ocrText       String?
+  familyId      String
+  family        Family            @relation(fields: [familyId], references: [id])
+  uploaderId    String
+  uploader      User              @relation(fields: [uploaderId], references: [id])
+  caseId        String?
+  case          Case?             @relation(fields: [caseId], references: [id])
+  agencyId      String?
+  agency        Agency?           @relation(fields: [agencyId], references: [id])
+  tags          DocumentTag[]
+  versions      DocumentVersion[]
+  comments      Comment[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model DocumentVersion {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  path        String
+  version     Int
+  createdAt   DateTime @default(now())
+}
+
+model Tag {
+  id        String         @id @default(cuid())
+  name      String
+  familyId  String
+  family    Family         @relation(fields: [familyId], references: [id])
+  agencyId  String?
+  agency    Agency?        @relation(fields: [agencyId], references: [id])
+  documents DocumentTag[]
+}
+
+model DocumentTag {
+  documentId String
+  tagId      String
+  document   Document @relation(fields: [documentId], references: [id])
+  tag        Tag      @relation(fields: [tagId], references: [id])
+
+  @@id([documentId, tagId])
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  content     String
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  caseId      String?
+  case        Case?     @relation(fields: [caseId], references: [id])
+  documentId  String?
+  document    Document? @relation(fields: [documentId], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  dueDate     DateTime?
+  completed   Boolean      @default(false)
+  repeatRule  String?
+  ownerId     String
+  owner       User         @relation(fields: [ownerId], references: [id])
+  caseId      String?
+  case        Case?        @relation(fields: [caseId], references: [id])
+  familyId    String
+  family      Family       @relation(fields: [familyId], references: [id])
+  reminders   Reminder[]
+  channels    TaskChannelAssignment[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model TaskChannelAssignment {
+  id        String     @id @default(cuid())
+  channel   TaskChannel
+  taskId    String
+  task      Task       @relation(fields: [taskId], references: [id])
+}
+
+model Reminder {
+  id        String   @id @default(cuid())
+  sendAt    DateTime
+  message   String
+  caseId    String?
+  case      Case?    @relation(fields: [caseId], references: [id])
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id])
+  familyId  String
+  family    Family   @relation(fields: [familyId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  channel   TaskChannel
+  read      Boolean  @default(false)
+  familyId  String
+  family    Family   @relation(fields: [familyId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model LetterTemplate {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  familyId  String
+  family    Family   @relation(fields: [familyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SecuritySetting {
+  id                   String   @id @default(cuid())
+  familyId             String   @unique
+  family               Family   @relation(fields: [familyId], references: [id])
+  encryptionEnabled    Boolean  @default(true)
+  allowExternalSharing Boolean  @default(false)
+  auditLogRetention    Int      @default(90)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  familyId  String
+  family    Family   @relation(fields: [familyId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
